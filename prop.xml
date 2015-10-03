@@ -1,0 +1,11 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<head>
+  <phonebook>
+    <version>1.9.0.0</version>
+    <path>d:\Temp\Phonebook2</path>    
+  </phonebook>
+  <phonebookUpd>
+    <versionUpd>1.2.0.0</versionUpd>
+    <pathUpd>d:\Temp\PhonebookUpdater</pathUpd>    
+  </phonebookUpd>
+</head>
