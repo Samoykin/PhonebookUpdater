@@ -1,32 +1,41 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Reflection;
-using System.Text;
-using System.Threading.Tasks;
-using System.Xml;
-
-namespace PhonebookUpdater
+﻿namespace PhonebookUpdater
 {
-    class XMLcode
+    using System.Collections.Generic;
+    using System.Reflection;
+    using System.Text;
+    using System.Xml;
+
+    /// <summary>Параметры XML.</summary>
+    public class XMLcode
     {
-        private string pathToXml = @"Updater\UpdProp.xml";
-        private string pathForUpd = @"d:\Temp\prop.xml";
+        private string updPropPath;
+
+        // private string pathToXml = @"Updater\UpdProp.xml";
+        // private string pathForUpd = @"d:\Temp\RemoteProp.xml";
         private string exQ = "0";
 
+        /// <summary>Initializes a new instance of the <see cref="XMLcode" /> class.</summary>
+        /// <param name="updPropPath">Путь к файлу.</param>
+        public XMLcode(string updPropPath)
+        {
+            this.updPropPath = updPropPath;
+        }
+
+        /// <summary>Создать XML.</summary>
         public void CreateXml()
         {
-            XmlTextWriter textWritter = new XmlTextWriter(pathToXml, Encoding.UTF8);
+            var textWritter = new XmlTextWriter(this.updPropPath, Encoding.UTF8);
             textWritter.WriteStartDocument();
             textWritter.WriteStartElement("head");
             textWritter.WriteEndElement();
             textWritter.Close();
         }
 
+        /// <summary>Создать узлы XML.</summary>
         public void CreateNodesXml()
         {
-            XmlDocument document = new XmlDocument();
-            document.Load(pathToXml);
+            var document = new XmlDocument();
+            document.Load(this.updPropPath);
 
             XmlNode upd = document.CreateElement("Update");
             document.DocumentElement.AppendChild(upd);
@@ -63,79 +72,93 @@ namespace PhonebookUpdater
             t7.InnerText = "1";
             upd.AppendChild(t7);
 
-
-
-            document.Save(pathToXml);
-
+            document.Save(this.updPropPath);
         }
 
+        /// <summary>Записать XML.</summary>
         public void WriteXml()
         {
+            var document = new XmlDocument();
+            document.Load(this.updPropPath);
 
-            XmlDocument document = new XmlDocument();
-            document.Load(pathToXml);
-
-            XmlElement xRoot = document.DocumentElement;
+            var xRoot = document.DocumentElement;
             foreach (XmlElement xnode in xRoot)
             {
                 foreach (XmlNode childnode in xnode.ChildNodes)
                 {
-                    if (childnode.Name == "path")
-                        childnode.InnerText = pathForUpd;
                     if (childnode.Name == "versionUpd")
+                    {
                         childnode.InnerText = Assembly.GetCallingAssembly().GetName().Version.ToString();
+                    }
                 }
             }
-            document.Save(pathToXml);
+
+            document.Save(this.updPropPath);
         }
 
-        public String ReadXml()
+        /// <summary>Считать XML.</summary>
+        /// <returns>Параметры.</returns>
+        public string ReadLocalPropXml()
         {
-            String ch = "";
+            var remotePropPath = string.Empty;
 
-            XmlDocument document = new XmlDocument();
-            document.Load(pathToXml);
+            var document = new XmlDocument();
+            document.Load(this.updPropPath);
 
-            XmlElement xRoot = document.DocumentElement;
+            var xRoot = document.DocumentElement;
             foreach (XmlElement xnode in xRoot)
             {
                 foreach (XmlNode childnode in xnode.ChildNodes)
                 {
                     if (childnode.Name == "path")
-                        ch = childnode.InnerText;
+                    {
+                        remotePropPath = childnode.InnerText;
+                    }
                 }
             }
 
-            return ch;
+            return remotePropPath;
         }
 
-        public List<String> ReadXmlForUpdate(string path)
+        /// <summary>Считать удаленный XML.</summary>
+        /// <param name="path">Путь к файлу.</param>
+        /// <returns>Параметры.</returns>
+        public List<string> ReadRemotePropXml(string path)
         {
-            //String[] ch = new String[27];
-            List<String> ch = new List<string>();
+            var ch = new List<string>();
 
-            XmlDocument document = new XmlDocument();
+            var document = new XmlDocument();
             document.Load(path);
 
-            XmlElement xRoot = document.DocumentElement;
+            var xRoot = document.DocumentElement;
             foreach (XmlElement xnode in xRoot)
             {
                 foreach (XmlNode childnode in xnode.ChildNodes)
                 {
-                    //параметры PhonebookUpdater
+                    // параметры PhonebookUpdater
                     if (childnode.Name == "version")
+                    {
                         ch.Add(childnode.InnerText);
+                    }
+
                     if (childnode.Name == "path")
+                    {
                         ch.Add(childnode.InnerText);
+                    }
+
                     if (childnode.Name == "versionUpd")
+                    {
                         ch.Add(childnode.InnerText);
+                    }
+
                     if (childnode.Name == "pathUpd")
+                    {
                         ch.Add(childnode.InnerText);
+                    }
                 }
             }
+
             return ch;
         }
-
-
     }
 }
