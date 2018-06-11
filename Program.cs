@@ -5,58 +5,76 @@
     using System.Diagnostics;
     using System.IO;
     using System.Linq;
+    using System.Reflection;
+    using Model;
+    using NLog;
+    using Utils;
 
     /// <summary>Программа Updater.</summary>
     public class Program
     {
-        private static string updPropPath = @"Updater\UpdaterProp.xml";
-        private static string tempFolderPath = Environment.CurrentDirectory + @"\Temp\";
-        private static string remotePropPath = string.Empty;
-        private static string excl1 = "Updater";
-        private static string excl2 = "Temp";
-        private static string targetName = "P3";
-
-        private static LogFile logFile = new LogFile();
-        private static List<string> ch = new List<string>();
-        private static XMLcode xml = new XMLcode(updPropPath);
+        private const string UpdPropPath = @"Updater\UpdaterProp.xml";
+        private const string Excl1 = "Updater";
+        private const string Excl2 = "Temp";
+        private const string TargetName = "P3";
+        private const string SettingsPath = @"Updater\UpdaterProp.xml";
+        private static string tempFolderPath = $@"{Environment.CurrentDirectory}\Temp\";
+        private static Logger logger = LogManager.GetCurrentClassLogger();
+        private static SettingsXml<SettingsShell.RootElement> settingsXml;
+        private static SettingsShell.RootElement settings;
+        private static RemoteSettingsShell.RootElementRemoteSettings remoteSettings;
 
         /// <summary>Основной метод.</summary>
         /// <param name="args">Аргументы.</param>
         public static void Main(string[] args)
         {
             // удаление процесса            
-            System.Diagnostics.Process[] local_procs = System.Diagnostics.Process.GetProcesses();
+            var localProcs = System.Diagnostics.Process.GetProcesses();
             try
             {
-                System.Diagnostics.Process target_proc = local_procs.First(p => p.ProcessName == targetName);
-                target_proc.Kill();
+                // Вычитывание параметров из XML
+                // Инициализация модели настроек
+                settingsXml = new SettingsXml<SettingsShell.RootElement>(SettingsPath);
+                settings.SoftUpdate = new SettingsShell.SoftUpdate();
 
-                var logText = DateTime.Now.ToString() + "|event|PhonebookUpdater - Program - Main|Программа P3.exe выключена";
-                logFile.WriteLog(logText);            
-
-                if (!File.Exists(updPropPath))
+                if (!File.Exists(SettingsPath))
                 {
-                    xml.CreateXml();
-                    xml.CreateNodesXml();
-                    xml.WriteXml();
+                    settings = SetDefaultValue(settings); // Значения по умолчанию
+                    settingsXml.WriteXml(settings);
+                }
+                else
+                {
+                    settings = settingsXml.ReadXml(settings);
                 }
 
-                remotePropPath = xml.ReadLocalPropXml();
+                // Вычитывание параметров из удаленного xml
+                // Инициализация модели настроек
+                var remoteSettingsXml = new SettingsXml<RemoteSettingsShell.RootElementRemoteSettings>(settings.SoftUpdate.RemoteSettingsPath);
+                remoteSettings.Phonebook = new RemoteSettingsShell.Phonebook();
+                remoteSettings.PhonebookUpd = new RemoteSettingsShell.PhonebookUpd();
 
-                if (remotePropPath != string.Empty)
+                if (!string.IsNullOrEmpty(settings.SoftUpdate.RemoteSettingsPath))
                 {
-                    ch = xml.ReadRemotePropXml(remotePropPath);
+                    remoteSettings = remoteSettingsXml.ReadXml(remoteSettings);
+                }
+
+                var targetProc = localProcs.First(p => p.ProcessName == TargetName);
+                targetProc.Kill();
+
+                logger.Info("Программа P3.exe выключена");
+                
+                if (!string.IsNullOrEmpty(settings.SoftUpdate.RemoteSettingsPath))
+                {
                     UpdateSoft();
                 }
                 else
                 {
-                    Console.WriteLine("Неверный путь к файлу конфигурации " + remotePropPath);                    
+                    Console.WriteLine($"Неверный путь к файлу конфигурации {settings.SoftUpdate.RemoteSettingsPath}");                    
                 }
             }
             catch (Exception ex)
             {
-                var logText = DateTime.Now.ToString() + "|fail|PhonebookUpdater - Program - Main|" + ex.Message;
-                logFile.WriteLog(logText);
+                logger.Error(ex.Message);
             }            
         }
 
@@ -64,8 +82,6 @@
         {
             try
             {
-                remotePropPath = ch[1];
-
                 if (Directory.Exists(tempFolderPath))
                 {
                     DelDir(tempFolderPath);
@@ -73,12 +89,10 @@
 
                 Directory.CreateDirectory(tempFolderPath);
 
-                CopyDir(ch[1], tempFolderPath);
+                CopyDir(remoteSettings.Phonebook.Path, tempFolderPath);
 
-                string[] fullfilesPath = Directory.GetFiles(Environment.CurrentDirectory);
-                string[] fullDirPath = Directory.GetDirectories(Environment.CurrentDirectory);
-
-                string temp;
+                var fullfilesPath = Directory.GetFiles(Environment.CurrentDirectory);
+                var fullDirPath = Directory.GetDirectories(Environment.CurrentDirectory);
 
                 foreach (var s in fullfilesPath)
                 {
@@ -87,10 +101,10 @@
 
                 foreach (var s in fullDirPath)
                 {
-                    temp = Path.GetFileNameWithoutExtension(s);
-                    if (temp != excl1 && temp != excl2)
+                    var temp = Path.GetFileNameWithoutExtension(s);
+                    if (temp != Excl1 && temp != Excl2)
                     {
-                        DirectoryInfo dir = new DirectoryInfo(s);
+                        var dir = new DirectoryInfo(s);
                         dir.Delete(true);
                     }
                 }
@@ -98,12 +112,11 @@
                 CopyDir(tempFolderPath, Environment.CurrentDirectory);
 
                 DelDir(tempFolderPath);
-                Process.Start(targetName + @".exe");
+                Process.Start($"{TargetName}.exe");
             }
             catch (Exception ex)
             {
-                var logText = DateTime.Now.ToString() + "|fail|PhonebookUpdater - Program - UpdateSoft|" + ex.Message;
-                logFile.WriteLog(logText);
+                logger.Error(ex.Message);
             }
         }
 
@@ -112,19 +125,17 @@
             try
             {
                 Directory.CreateDirectory(toDir);
-                foreach (string s1 in Directory.GetFiles(fromDir))
+                foreach (var s1 in Directory.GetFiles(fromDir))
                 {
-                    var s2 = toDir + "\\" + Path.GetFileName(s1);
+                    var s2 = Path.Combine(toDir, Path.GetFileName(s1));
                     File.Copy(s1, s2);
                 }
 
-                var logText = DateTime.Now.ToString() + "|event|PhonebookUpdater - Program - CopyDir| Копирование файлов Updaytera завершено";
-                logFile.WriteLog(logText);
+                logger.Info("Копирование файлов Updaytera завершено");
             }
             catch (Exception ex)
             {
-                string logText = DateTime.Now.ToString() + "|fail|PhonebookUpdater - Program - CopyDir|" + ex.Message;
-                logFile.WriteLog(logText);
+                logger.Error(ex.Message);
             }
         }
 
@@ -132,26 +143,31 @@
         {
             try
             {
-                DirectoryInfo dir = new DirectoryInfo(dirPath);
+                var dir = new DirectoryInfo(dirPath);
 
-                foreach (FileInfo file in dir.GetFiles())
+                foreach (var file in dir.GetFiles())
                 {
                     file.Delete();
                 }
 
-                foreach (DirectoryInfo subDirectory in dir.GetDirectories())
+                foreach (var subDirectory in dir.GetDirectories())
                 {
                     subDirectory.Delete(true);
                 }
 
-                var logText = DateTime.Now.ToString() + "|event|PhonebookUpdater - Program - DelDir| Удаление папки " + dirPath + " завершено";
-                logFile.WriteLog(logText);
+                logger.Info($"Удаление папки {dirPath} завершено");
             }
             catch (Exception ex)
             {
-                var logText = DateTime.Now.ToString() + "|fail|PhonebookUpdater - Program - DelDir|" + ex.Message;
-                logFile.WriteLog(logText);
+                logger.Error(ex.Message);
             }
-        }         
+        }
+
+        private static SettingsShell.RootElement SetDefaultValue(SettingsShell.RootElement set)
+        {
+            set.SoftUpdate.RemoteSettingsPath = @"d:\Temp\RemoteProp.xml";
+            set.SoftUpdate.VersionUpd = Assembly.GetCallingAssembly().GetName().Version.ToString();
+            return set;
+        }
     }
 }
