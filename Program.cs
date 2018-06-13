@@ -1,7 +1,6 @@
 ﻿namespace PhonebookUpdater
 {
     using System;
-    using System.Collections.Generic;
     using System.Diagnostics;
     using System.IO;
     using System.Linq;
@@ -29,7 +28,7 @@
         public static void Main(string[] args)
         {
             // удаление процесса            
-            var localProcs = System.Diagnostics.Process.GetProcesses();
+            var localProcs = Process.GetProcesses();
             try
             {
                 // Вычитывание параметров из XML
